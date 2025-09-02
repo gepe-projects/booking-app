@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      target: dev
+    container_name: booking-app
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+      - go_cache:/go/pkg/mod # cache biar lebih cepat
+      - go_build:/root/.cache/go-build
+    networks:
+      - booking_app
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - gepe_network
+
+  redis:
+    image: redis:8.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=root
+    command: ["redis-server", "--requirepass", "root"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - booking_app
+
+volumes:
+  postgres_data:
+  redis_data:
+  go_cache:
+  go_build:
+
+networks:
+  booking_app:
+    driver: bridge
