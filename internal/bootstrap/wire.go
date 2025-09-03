@@ -12,6 +12,7 @@ import (
 	"booking/pkg/database"
 	"booking/pkg/logger"
 	"booking/pkg/redis"
+	"booking/pkg/security"
 )
 
 type Apps struct {
@@ -26,19 +27,23 @@ func InitializeApps() *Apps {
 	db := database.InitDB(&config.Database, logger)
 	rdb := redis.NewClient(&config.Redis, logger)
 
+	// security
+	security := security.NewSecurity(rdb, logger)
+
 	// repository
 	userRepo := ur.NewUserRepository(db)
 
 	// usecase
-	userUsecase := userUsecase.NewUserUseCase(userRepo, rdb, logger)
-	authUsecase := authUsecase.NewAuthUsecase(userUsecase, rdb, logger)
+	userUsecase := userUsecase.NewUserUseCase(userRepo, security, logger)
+	authUsecase := authUsecase.NewAuthUsecase(userUsecase, security, logger)
 
 	// middleware
-	middlewares := middleware.NewMiddlewares(rdb, logger)
+	middlewares := middleware.NewMiddlewares(security, rdb, logger)
 
 	// handler
 	userHandler := userHandler.NewUserHandler(userUsecase, middlewares, logger)
 	authHandler := authHandler.NewAuthHandler(authUsecase, middlewares, logger, config)
+
 	// server
 	srv := server.NewFiber(&config.Gateway, logger)
 

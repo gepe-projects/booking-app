@@ -6,20 +6,18 @@ import (
 	"booking/internal/domain"
 	"booking/pkg/logger"
 	"booking/pkg/security"
-
-	"github.com/redis/go-redis/v9"
 )
 
 type authUsecase struct {
 	userUsecase domain.UserUsecase
-	rdb         *redis.Client
+	security    *security.Security
 	log         logger.Logger
 }
 
-func NewAuthUsecase(userUsecase domain.UserUsecase, rdb *redis.Client, log logger.Logger) domain.AuthUsecase {
+func NewAuthUsecase(userUsecase domain.UserUsecase, security *security.Security, log logger.Logger) domain.AuthUsecase {
 	return &authUsecase{
 		userUsecase: userUsecase,
-		rdb:         rdb,
+		security:    security,
 		log:         log,
 	}
 }
@@ -44,5 +42,5 @@ func (u *authUsecase) Login(ctx context.Context, req *domain.LoginDTO) (*domain.
 }
 
 func (u *authUsecase) GetAllActiveSessions(ctx context.Context, userId string) ([]domain.SessionWithExpiry, error) {
-	return security.GetUserActiveSessionsWithDetails(ctx, u.rdb, userId, u.log)
+	return u.security.GetUserActiveSessionsWithDetails(ctx, userId)
 }

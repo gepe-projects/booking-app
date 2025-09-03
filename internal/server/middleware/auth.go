@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"booking/internal/domain"
-	"booking/pkg/security"
 	"booking/pkg/utils"
 
 	"github.com/gofiber/fiber/v3"
@@ -21,7 +20,7 @@ func (m *Middleware) Auth() fiber.Handler {
 			})
 		} else if string(c.Request().Header.Cookie("session")) != "" {
 			sessionToken := c.Request().Header.Cookie("session")
-			session, err := security.GetSession(c.RequestCtx(), m.rdb, string(sessionToken), m.log)
+			session, err := m.security.GetSession(c.RequestCtx(), string(sessionToken))
 			if err != nil {
 				return utils.ErrorResponse(c, domain.ErrUnauthorized, nil)
 			}

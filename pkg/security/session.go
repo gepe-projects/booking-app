@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"booking/internal/domain"
-	"booking/pkg/logger"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -23,18 +22,16 @@ const (
 // CREATE & EXTEND SESSION
 // =============================
 
-func CreateSession(
+func (s *Security) CreateSession(
 	ctx context.Context,
-	rdb *redis.Client,
 	data *domain.UserWithIdentity,
-	log logger.Logger,
 	device string,
 	userAgent string,
 	ipAddress string,
 ) (string, error) {
 	token, err := generateOpaqueToken(32)
 	if err != nil {
-		log.Error(err, "failed to generate opaque token")
+		s.log.Error(err, "failed to generate opaque token")
 		return "", err
 	}
 
@@ -58,7 +55,7 @@ func CreateSession(
 
 	expireTime := time.Now().Add(sessionTTL).Unix()
 
-	pipe := rdb.Pipeline()
+	pipe := s.rdb.Pipeline()
 	pipe.HSet(ctx, sessionKey, sessionValues.ToRedisMap())
 	pipe.Expire(ctx, sessionKey, sessionTTL)
 	pipe.ZAdd(ctx, userSessionsKey, redis.Z{
@@ -68,18 +65,18 @@ func CreateSession(
 	pipe.Expire(ctx, userSessionsKey, userSessionTTL)
 	_, err = pipe.Exec(ctx)
 	if err != nil {
-		log.Error(err, "failed to create session pipeline")
+		s.log.Error(err, "failed to create session pipeline")
 		return "", err
 	}
 
 	return token, nil
 }
 
-func ExtendSession(ctx context.Context, rdb *redis.Client, token string, userID string) error {
+func (s *Security) ExtendSession(ctx context.Context, token string, userID string) error {
 	sessionKey := generateSessionKey(token)
 	userSessionsKey := generateUserSessionsKey(userID)
 
-	exists, err := rdb.Exists(ctx, sessionKey).Result()
+	exists, err := s.rdb.Exists(ctx, sessionKey).Result()
 	if err != nil {
 		return err
 	}
@@ -89,7 +86,7 @@ func ExtendSession(ctx context.Context, rdb *redis.Client, token string, userID 
 
 	newExpireTime := time.Now().Add(sessionTTL).Unix()
 
-	pipe := rdb.Pipeline()
+	pipe := s.rdb.Pipeline()
 	pipe.Expire(ctx, sessionKey, sessionTTL)
 	pipe.ZAdd(ctx, userSessionsKey, redis.Z{
 		Score:  float64(newExpireTime),
@@ -104,31 +101,31 @@ func ExtendSession(ctx context.Context, rdb *redis.Client, token string, userID 
 // GET SESSION
 // =============================
 
-func GetSession(ctx context.Context, rdb *redis.Client, token string, log logger.Logger) (*domain.Session, error) {
+func (s *Security) GetSession(ctx context.Context, token string) (*domain.Session, error) {
 	sessionKey := generateSessionKey(token)
 
-	pipe := rdb.Pipeline()
+	pipe := s.rdb.Pipeline()
 	hgetallCmd := pipe.HGetAll(ctx, sessionKey)
 	ttlCmd := pipe.TTL(ctx, sessionKey)
 	if _, err := pipe.Exec(ctx); err != nil {
-		log.Error(err, "failed to exec GetSession pipeline")
+		s.log.Error(err, "failed to exec GetSession pipeline")
 		return nil, domain.ErrInternalServerError
 	}
 
 	if len(hgetallCmd.Val()) == 0 {
-		log.Error(nil, "session not found")
+		s.log.Error(nil, "session not found")
 		return nil, domain.ErrUnauthorized
 	}
 
 	var session domain.Session
 	if err := hgetallCmd.Scan(&session); err != nil {
-		log.Error(err, "failed to scan hgetallCmd to session")
+		s.log.Error(err, "failed to scan hgetallCmd to session")
 		return nil, domain.ErrInternalServerError
 	}
 
 	if ttlCmd.Val() < sessionExtendTTL && ttlCmd.Val() > 0 {
-		if err := ExtendSession(ctx, rdb, token, session.UserID); err != nil {
-			log.Error(err, "failed to extend session")
+		if err := s.ExtendSession(ctx, token, session.UserID); err != nil {
+			s.log.Error(err, "failed to extend session")
 		}
 	}
 	return &session, nil
@@ -138,15 +135,15 @@ func GetSession(ctx context.Context, rdb *redis.Client, token string, log logger
 // GET USER ACTIVE SESSIONS (CLEANUP AUTO)
 // =============================
 
-func GetUserActiveSessionsWithDetails(ctx context.Context, rdb *redis.Client, userID string, log logger.Logger) ([]domain.SessionWithExpiry, error) {
+func (s *Security) GetUserActiveSessionsWithDetails(ctx context.Context, userID string) ([]domain.SessionWithExpiry, error) {
 	userSessionsKey := generateUserSessionsKey(userID)
 	now := time.Now().Unix()
 
 	// Hapus expired tokens dulu
-	_, _ = rdb.ZRemRangeByScore(ctx, userSessionsKey, "-inf", fmt.Sprintf("%d", now)).Result()
+	_, _ = s.rdb.ZRemRangeByScore(ctx, userSessionsKey, "-inf", fmt.Sprintf("%d", now)).Result()
 
 	// Ambil tokens dengan score (expire time)
-	tokensWithScores, err := rdb.ZRangeByScoreWithScores(ctx, userSessionsKey, &redis.ZRangeBy{
+	tokensWithScores, err := s.rdb.ZRangeByScoreWithScores(ctx, userSessionsKey, &redis.ZRangeBy{
 		Min: fmt.Sprintf("%d", now),
 		Max: "+inf",
 	}).Result()
@@ -166,7 +163,7 @@ func GetUserActiveSessionsWithDetails(ctx context.Context, rdb *redis.Client, us
 		expireTime := int64(tokenScore.Score)
 
 		sessionKey := generateSessionKey(token)
-		sessionData, err := rdb.HGetAll(ctx, sessionKey).Result()
+		sessionData, err := s.rdb.HGetAll(ctx, sessionKey).Result()
 		if err != nil || len(sessionData) == 0 {
 			zombieTokens = append(zombieTokens, token)
 			continue
@@ -174,7 +171,7 @@ func GetUserActiveSessionsWithDetails(ctx context.Context, rdb *redis.Client, us
 
 		var session domain.Session
 		if err := mapToSession(sessionData, &session); err != nil {
-			log.Error(err, "failed to convert session data")
+			s.log.Error(err, "failed to convert session data")
 			continue
 		}
 
@@ -187,8 +184,8 @@ func GetUserActiveSessionsWithDetails(ctx context.Context, rdb *redis.Client, us
 
 	// Hapus zombie tokens dari ZSET
 	if len(zombieTokens) > 0 {
-		_, _ = rdb.ZRem(ctx, userSessionsKey, zombieTokens).Result()
-		log.Infof("cleaned %d zombie tokens for user:%s", len(zombieTokens), userID)
+		_, _ = s.rdb.ZRem(ctx, userSessionsKey, zombieTokens).Result()
+		s.log.Infof("cleaned %d zombie tokens for user:%s", len(zombieTokens), userID)
 	}
 
 	return sessionsWithExpiry, nil
@@ -198,20 +195,20 @@ func GetUserActiveSessionsWithDetails(ctx context.Context, rdb *redis.Client, us
 // LOGOUT
 // =============================
 
-func LogoutSession(ctx context.Context, rdb *redis.Client, userID, token string) error {
+func (s *Security) LogoutSession(ctx context.Context, userID, token string) error {
 	sessionKey := generateSessionKey(token)
 	userSessionsKey := generateUserSessionsKey(userID)
 
-	pipe := rdb.Pipeline()
+	pipe := s.rdb.Pipeline()
 	pipe.Del(ctx, sessionKey)
 	pipe.ZRem(ctx, userSessionsKey, token)
 	_, err := pipe.Exec(ctx)
 	return err
 }
 
-func LogoutAllSessions(ctx context.Context, rdb *redis.Client, userID string) error {
+func (s *Security) LogoutAllSessions(ctx context.Context, userID string) error {
 	userSessionsKey := generateUserSessionsKey(userID)
-	tokens, err := rdb.ZRange(ctx, userSessionsKey, 0, -1).Result()
+	tokens, err := s.rdb.ZRange(ctx, userSessionsKey, 0, -1).Result()
 	if err != nil {
 		return err
 	}
@@ -219,7 +216,7 @@ func LogoutAllSessions(ctx context.Context, rdb *redis.Client, userID string) er
 		return nil
 	}
 
-	pipe := rdb.Pipeline()
+	pipe := s.rdb.Pipeline()
 	for _, token := range tokens {
 		pipe.Del(ctx, generateSessionKey(token))
 	}
@@ -228,14 +225,14 @@ func LogoutAllSessions(ctx context.Context, rdb *redis.Client, userID string) er
 	return err
 }
 
-func LogoutOtherSessions(ctx context.Context, rdb *redis.Client, userID, currentToken string) error {
+func (s *Security) LogoutOtherSessions(ctx context.Context, userID, currentToken string) error {
 	userSessionsKey := generateUserSessionsKey(userID)
-	tokens, err := rdb.ZRange(ctx, userSessionsKey, 0, -1).Result()
+	tokens, err := s.rdb.ZRange(ctx, userSessionsKey, 0, -1).Result()
 	if err != nil {
 		return err
 	}
 
-	pipe := rdb.Pipeline()
+	pipe := s.rdb.Pipeline()
 	for _, token := range tokens {
 		if token == currentToken {
 			continue

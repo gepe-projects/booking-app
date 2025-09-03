@@ -12,20 +12,19 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type userUseCase struct {
+	security       *security.Security
 	userRepository domain.UserRepository
-	rdb            *redis.Client
 	log            logger.Logger
 }
 
-func NewUserUseCase(userRepository domain.UserRepository, rdb *redis.Client, log logger.Logger) domain.UserUsecase {
+func NewUserUseCase(userRepository domain.UserRepository, security *security.Security, log logger.Logger) domain.UserUsecase {
 	return &userUseCase{
 		userRepository: userRepository,
-		rdb:            rdb,
+		security:       security,
 		log:            log,
 	}
 }
@@ -105,15 +104,15 @@ func (u *userUseCase) Login(ctx context.Context, req *domain.LoginDTO) (*domain.
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(*res.UserIdentity.PasswordHash), []byte(req.Password))
 	if err != nil {
-		_, _ = security.IncrementAttempts(ctx, u.rdb, req.Email, u.log)
+		_, _ = u.security.IncrementAttempts(ctx, req.Email)
 		return nil, "", domain.ErrInvalidCredentials
 	}
-	if err := security.ResetLoginAttempts(ctx, u.rdb, req.Email, u.log); err != nil {
+	if err := u.security.ResetLoginAttempts(ctx, req.Email); err != nil {
 		return nil, "", domain.ErrInternalServerError
 	}
 
 	// create session
-	token, err := security.CreateSession(ctx, u.rdb, res, u.log, req.Device, req.UserAgent, req.IpAddress)
+	token, err := u.security.CreateSession(ctx, res, req.Device, req.UserAgent, req.IpAddress)
 	if err != nil {
 		u.log.Error(err, "failed to create session")
 		return nil, "", domain.ErrInternalServerError
