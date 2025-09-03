@@ -12,12 +12,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const (
-	sessionTTL       = 1 * time.Minute    // TTL sliding session
-	sessionExtendTTL = 30 * time.Minute   // extend kalau sisa < 30 menit
-	userSessionTTL   = 7 * 24 * time.Hour // kalo user cuma coba coba login, dihapus setelah 30 hari
-)
-
 // =============================
 // CREATE & EXTEND SESSION
 // =============================
@@ -53,16 +47,16 @@ func (s *Security) CreateSession(
 		IpAddress:  ipAddress,
 	}
 
-	expireTime := time.Now().Add(sessionTTL).Unix()
+	expireTime := time.Now().Add(s.config.App.AuthSessionTtl).Unix()
 
 	pipe := s.rdb.Pipeline()
 	pipe.HSet(ctx, sessionKey, sessionValues.ToRedisMap())
-	pipe.Expire(ctx, sessionKey, sessionTTL)
+	pipe.Expire(ctx, sessionKey, s.config.App.AuthSessionTtl)
 	pipe.ZAdd(ctx, userSessionsKey, redis.Z{
 		Score:  float64(expireTime),
 		Member: token,
 	})
-	pipe.Expire(ctx, userSessionsKey, userSessionTTL)
+	pipe.Expire(ctx, userSessionsKey, s.config.App.AuthSessionsTtl)
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		s.log.Error(err, "failed to create session pipeline")
@@ -84,15 +78,15 @@ func (s *Security) ExtendSession(ctx context.Context, token string, userID strin
 		return domain.ErrUnauthorized
 	}
 
-	newExpireTime := time.Now().Add(sessionTTL).Unix()
+	newExpireTime := time.Now().Add(s.config.App.AuthSessionTtl).Unix()
 
 	pipe := s.rdb.Pipeline()
-	pipe.Expire(ctx, sessionKey, sessionTTL)
+	pipe.Expire(ctx, sessionKey, s.config.App.AuthSessionTtl)
 	pipe.ZAdd(ctx, userSessionsKey, redis.Z{
 		Score:  float64(newExpireTime),
 		Member: token,
 	})
-	pipe.Expire(ctx, userSessionsKey, userSessionTTL)
+	pipe.Expire(ctx, userSessionsKey, s.config.App.AuthSessionsTtl)
 	_, err = pipe.Exec(ctx)
 	return err
 }
@@ -123,7 +117,7 @@ func (s *Security) GetSession(ctx context.Context, token string) (*domain.Sessio
 		return nil, domain.ErrInternalServerError
 	}
 
-	if ttlCmd.Val() < sessionExtendTTL && ttlCmd.Val() > 0 {
+	if ttlCmd.Val() < s.config.App.AuthExetendTtl && ttlCmd.Val() > 0 {
 		if err := s.ExtendSession(ctx, token, session.UserID); err != nil {
 			s.log.Error(err, "failed to extend session")
 		}

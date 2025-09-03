@@ -19,9 +19,11 @@ type Config struct {
 }
 
 type App struct {
-	Env            string
-	WebDomain      string
-	AuthSessionTtl time.Duration
+	Env             string
+	WebDomain       string
+	AuthSessionTtl  time.Duration
+	AuthSessionsTtl time.Duration
+	AuthExetendTtl  time.Duration
 }
 
 type GatewayConfig struct {
@@ -62,9 +64,11 @@ func LoadConfig() *Config {
 
 	return &Config{
 		App: App{
-			Env:            getEnv("APP_ENV", "dev"),
-			WebDomain:      getEnv("APP_WEB_DOMAIN", "localhost"),
-			AuthSessionTtl: getEnvDuration("APP_AUTH_SESSION_TTL", 24*time.Hour),
+			Env:             getEnv("APP_ENV", "dev"),
+			WebDomain:       getEnv("APP_WEB_DOMAIN", "localhost"),
+			AuthSessionTtl:  getEnvDuration("APP_AUTH_SESSION_TTL", 24*time.Hour),
+			AuthSessionsTtl: getEnvDuration("APP_AUTH_SESSIONS_TTL", 7*24*time.Hour),
+			AuthExetendTtl:  getEnvDuration("APP_AUTH_EXTEND_TTL", 30*time.Minute),
 		},
 		Gateway: GatewayConfig{
 			Port: getEnv("GATEWAY_PORT", "8080"),

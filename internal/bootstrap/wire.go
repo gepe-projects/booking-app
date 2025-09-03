@@ -28,7 +28,7 @@ func InitializeApps() *Apps {
 	rdb := redis.NewClient(&config.Redis, logger)
 
 	// security
-	security := security.NewSecurity(rdb, logger)
+	security := security.NewSecurity(config, rdb, logger)
 
 	// repository
 	userRepo := ur.NewUserRepository(db)
