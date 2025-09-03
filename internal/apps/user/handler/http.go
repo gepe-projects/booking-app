@@ -25,12 +25,13 @@ func (h *userHandler) RegisterRoutes(r fiber.Router) {
 }
 
 func (h *userHandler) getUser(c fiber.Ctx) error {
-	res, err := h.UseCase.GetByEmail(c.RequestCtx(), c.Query("email"))
-	if err != nil {
-		return utils.ErrorResponse(c, err, nil)
+	val := c.Locals(domain.SessionCtxKey)
+	session, ok := val.(*domain.Session)
+	if !ok || session == nil {
+		return utils.ErrorResponse(c, domain.ErrUnauthorized, nil)
 	}
 
 	return c.JSON(fiber.Map{
-		"data": res,
+		"data": session,
 	})
 }

@@ -2,12 +2,9 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"booking/internal/domain"
-	"booking/pkg/constant"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -78,13 +75,6 @@ func (r *userRepository) RegisterUser(ctx context.Context, req *domain.RegisterD
 		req.Role,
 	).StructScan(&user)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case constant.PgErrUniqueViolation:
-				return nil, err
-			}
-		}
 		return nil, err
 	}
 	// insert ke user_identities

@@ -21,6 +21,8 @@ type UserWithIdentity struct {
 
 type UserUsecase interface {
 	GetByEmail(ctx context.Context, email string) (*UserWithIdentity, error)
+	RegisterUser(ctx context.Context, req *RegisterDTO) (res *UserWithIdentity, err error)
+	Login(ctx context.Context, req *LoginDTO) (res *UserWithIdentity, token string, err error)
 }
 
 type UserRepository interface {

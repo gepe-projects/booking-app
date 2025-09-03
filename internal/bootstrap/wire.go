@@ -30,8 +30,8 @@ func InitializeApps() *Apps {
 	userRepo := ur.NewUserRepository(db)
 
 	// usecase
-	userUsecase := userUsecase.NewUserUseCase(userRepo, logger)
-	authUsecase := authUsecase.NewAuthUsecase(userRepo, rdb, logger)
+	userUsecase := userUsecase.NewUserUseCase(userRepo, rdb, logger)
+	authUsecase := authUsecase.NewAuthUsecase(userUsecase, rdb, logger)
 
 	// middleware
 	middlewares := middleware.NewMiddlewares(rdb, logger)

@@ -40,6 +40,7 @@ func NewAuthHandler(
 func (h *authHandler) RegisterRoutes(r fiber.Router) {
 	r.Post("/register", h.register)
 	r.Post("/login", h.mw.LoginLimiter(), h.login)
+	r.Get("/sessions", h.mw.Auth(), h.getAllActiveSessions)
 }
 
 func (h *authHandler) register(c fiber.Ctx) error {
@@ -91,5 +92,17 @@ func (h *authHandler) login(c fiber.Ctx) error {
 	return c.JSON(domain.HttpResponse{
 		Success: true,
 		Data:    res,
+	})
+}
+
+func (h *authHandler) getAllActiveSessions(c fiber.Ctx) error {
+	userId := c.Locals(domain.SessionCtxKey).(*domain.Session).UserID
+	sessions, err := h.authUsecase.GetAllActiveSessions(c.RequestCtx(), userId)
+	if err != nil {
+		return utils.ErrorResponse(c, err, nil)
+	}
+	return c.JSON(domain.HttpResponse{
+		Success: true,
+		Data:    sessions,
 	})
 }

@@ -19,14 +19,12 @@ func (m *Middleware) Auth() fiber.Handler {
 				Success: false,
 				Message: domain.ErrInternalServerError,
 			})
-		} else if c.Get("session") != "" {
+		} else if string(c.Request().Header.Cookie("session")) != "" {
 			sessionToken := c.Request().Header.Cookie("session")
 			session, err := security.GetSession(c.RequestCtx(), m.rdb, string(sessionToken), m.log)
 			if err != nil {
-				m.log.Error(err, "failed to get session")
 				return utils.ErrorResponse(c, domain.ErrUnauthorized, nil)
 			}
-
 			c.Locals(domain.SessionCtxKey, session)
 		}
 

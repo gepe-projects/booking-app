@@ -112,17 +112,18 @@ func GetSession(ctx context.Context, rdb *redis.Client, token string, log logger
 	ttlCmd := pipe.TTL(ctx, sessionKey)
 	if _, err := pipe.Exec(ctx); err != nil {
 		log.Error(err, "failed to exec GetSession pipeline")
-		return nil, err
+		return nil, domain.ErrInternalServerError
 	}
 
 	if len(hgetallCmd.Val()) == 0 {
+		log.Error(nil, "session not found")
 		return nil, domain.ErrUnauthorized
 	}
 
 	var session domain.Session
 	if err := hgetallCmd.Scan(&session); err != nil {
 		log.Error(err, "failed to scan hgetallCmd to session")
-		return nil, err
+		return nil, domain.ErrInternalServerError
 	}
 
 	if ttlCmd.Val() < sessionExtendTTL && ttlCmd.Val() > 0 {
@@ -130,7 +131,6 @@ func GetSession(ctx context.Context, rdb *redis.Client, token string, log logger
 			log.Error(err, "failed to extend session")
 		}
 	}
-
 	return &session, nil
 }
 
@@ -252,18 +252,18 @@ func LogoutOtherSessions(ctx context.Context, rdb *redis.Client, userID, current
 // =============================
 
 func mapToSession(data map[string]string, session *domain.Session) error {
-	session.UserID = data["UserID"]
-	session.Name = data["Name"]
-	session.Role = data["Role"]
-	session.ImageURL = data["ImageURL"]
-	session.Email = data["Email"]
-	session.Provider = data["Provider"]
-	session.ProviderID = data["ProviderID"]
-	session.Phone = data["Phone"]
-	session.Verified = data["Verified"]
-	session.Device = data["Device"]
-	session.UserAgent = data["UserAgent"]
-	session.IpAddress = data["IpAddress"]
+	session.UserID = data["userID"]
+	session.Name = data["name"]
+	session.Role = data["role"]
+	session.ImageURL = data["image_url"]
+	session.Email = data["email"]
+	session.Provider = data["provider"]
+	session.ProviderID = data["provider_id"]
+	session.Phone = data["phone"]
+	session.Verified = data["verified"]
+	session.Device = data["device"]
+	session.UserAgent = data["user_agent"]
+	session.IpAddress = data["ip_address"]
 	return nil
 }
 
