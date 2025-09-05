@@ -1,12 +1,11 @@
 package database
 
 import (
+	"booking/pkg/config"
+	"booking/pkg/logger"
 	"context"
 	"fmt"
 	"time"
-
-	"booking/pkg/config"
-	"booking/pkg/logger"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -38,6 +37,7 @@ func InitDB(config *config.DatabaseConfig, log logger.Logger) *sqlx.DB {
 	if err != nil {
 		log.Fatalf(err, "error pinging database")
 	}
+	RunMigrations(db.DB, connString)
 
 	log.Infof("Database pool initialized successfully - MaxOpenConns: %d, MaxIdleConns: %d",
 		config.MaxOpenConns, config.MaxIdleConns)
