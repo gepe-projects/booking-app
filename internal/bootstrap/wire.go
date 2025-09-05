@@ -38,7 +38,7 @@ func InitializeApps() *Apps {
 	authUsecase := authUsecase.NewAuthUsecase(userUsecase, security, logger)
 
 	// middleware
-	middlewares := middleware.NewMiddlewares(security, rdb, logger)
+	middlewares := middleware.NewMiddlewares(security, rdb, config, logger)
 
 	// handler
 	userHandler := userHandler.NewUserHandler(userUsecase, middlewares, logger)

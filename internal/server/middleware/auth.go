@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"time"
+
 	"booking/internal/domain"
 	"booking/pkg/utils"
 
@@ -20,9 +22,20 @@ func (m *Middleware) Auth() fiber.Handler {
 			})
 		} else if string(c.Request().Header.Cookie("session")) != "" {
 			sessionToken := c.Request().Header.Cookie("session")
-			session, err := m.security.GetSession(c.RequestCtx(), string(sessionToken))
+			session, refreshed, err := m.security.GetSession(c.RequestCtx(), string(sessionToken))
 			if err != nil {
 				return utils.ErrorResponse(c, domain.ErrUnauthorized, nil)
+			}
+			if refreshed {
+				c.Cookie(&fiber.Cookie{
+					Name:     "session",
+					Value:    string(sessionToken),
+					Expires:  time.Now().Add(m.config.App.AuthSessionTtl),
+					HTTPOnly: true,
+					Secure:   m.config.App.Env == "prod",
+					SameSite: "Lax",
+					Path:     "/",
+				})
 			}
 			c.Locals(domain.SessionCtxKey, session)
 		}

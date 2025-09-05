@@ -21,7 +21,7 @@ func NewUserHandler(useCase domain.UserUsecase, middleware *middleware.Middlewar
 
 func (h *userHandler) RegisterRoutes(r fiber.Router) {
 	r.Use(h.middleware.Auth())
-	r.Get("/", h.getUser)
+	r.Get("/me", h.getUser)
 }
 
 func (h *userHandler) getUser(c fiber.Ctx) error {
@@ -30,6 +30,8 @@ func (h *userHandler) getUser(c fiber.Ctx) error {
 	if !ok || session == nil {
 		return utils.ErrorResponse(c, domain.ErrUnauthorized, nil)
 	}
+
+	c.Response().Header.Set("Cache-Control", "private, max-age=60")
 
 	return c.JSON(fiber.Map{
 		"data": session,

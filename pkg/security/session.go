@@ -95,7 +95,7 @@ func (s *Security) ExtendSession(ctx context.Context, token string, userID strin
 // GET SESSION
 // =============================
 
-func (s *Security) GetSession(ctx context.Context, token string) (*domain.Session, error) {
+func (s *Security) GetSession(ctx context.Context, token string) (session *domain.Session, refreshed bool, err error) {
 	sessionKey := generateSessionKey(token)
 
 	pipe := s.rdb.Pipeline()
@@ -103,26 +103,27 @@ func (s *Security) GetSession(ctx context.Context, token string) (*domain.Sessio
 	ttlCmd := pipe.TTL(ctx, sessionKey)
 	if _, err := pipe.Exec(ctx); err != nil {
 		s.log.Error(err, "failed to exec GetSession pipeline")
-		return nil, domain.ErrInternalServerError
+		return nil, false, domain.ErrInternalServerError
 	}
 
 	if len(hgetallCmd.Val()) == 0 {
 		s.log.Error(nil, "session not found")
-		return nil, domain.ErrUnauthorized
+		return nil, false, domain.ErrUnauthorized
 	}
 
-	var session domain.Session
+	// var session domain.Session
 	if err := hgetallCmd.Scan(&session); err != nil {
 		s.log.Error(err, "failed to scan hgetallCmd to session")
-		return nil, domain.ErrInternalServerError
+		return nil, false, domain.ErrInternalServerError
 	}
 
 	if ttlCmd.Val() < s.config.App.AuthExetendTtl && ttlCmd.Val() > 0 {
 		if err := s.ExtendSession(ctx, token, session.UserID); err != nil {
 			s.log.Error(err, "failed to extend session")
 		}
+		return session, true, nil
 	}
-	return &session, nil
+	return session, false, nil
 }
 
 // =============================

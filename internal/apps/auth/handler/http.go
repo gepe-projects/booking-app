@@ -83,12 +83,14 @@ func (h *authHandler) login(c fiber.Ctx) error {
 	}
 	// set cookies
 	c.Cookie(&fiber.Cookie{
-		Expires:  time.Now().Add(2 * time.Hour),
 		Name:     "session",
 		Value:    token,
-		HTTPOnly: h.config.App.Env == "prod",
+		Expires:  time.Now().Add(h.config.App.AuthSessionTtl),
+		HTTPOnly: true,
+		Secure:   h.config.App.Env == "prod",
+		SameSite: "Lax",
+		Path:     "/",
 	})
-
 	return c.JSON(domain.HttpResponse{
 		Success: true,
 		Data:    res,
