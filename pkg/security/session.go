@@ -95,7 +95,7 @@ func (s *Security) ExtendSession(ctx context.Context, token string, userID strin
 // GET SESSION
 // =============================
 
-func (s *Security) GetSession(ctx context.Context, token string) (session *domain.Session, refreshed bool, err error) {
+func (s *Security) GetSession(ctx context.Context, token string) (*domain.Session, bool, error) {
 	sessionKey := generateSessionKey(token)
 
 	pipe := s.rdb.Pipeline()
@@ -111,7 +111,7 @@ func (s *Security) GetSession(ctx context.Context, token string) (session *domai
 		return nil, false, domain.ErrUnauthorized
 	}
 
-	// var session domain.Session
+	var session domain.Session
 	if err := hgetallCmd.Scan(&session); err != nil {
 		s.log.Error(err, "failed to scan hgetallCmd to session")
 		return nil, false, domain.ErrInternalServerError
@@ -121,9 +121,9 @@ func (s *Security) GetSession(ctx context.Context, token string) (session *domai
 		if err := s.ExtendSession(ctx, token, session.UserID); err != nil {
 			s.log.Error(err, "failed to extend session")
 		}
-		return session, true, nil
+		return &session, true, nil
 	}
-	return session, false, nil
+	return &session, false, nil
 }
 
 // =============================

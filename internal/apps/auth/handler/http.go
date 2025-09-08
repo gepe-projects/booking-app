@@ -88,7 +88,7 @@ func (h *authHandler) login(c fiber.Ctx) error {
 		Expires:  time.Now().Add(h.config.App.AuthSessionTtl),
 		HTTPOnly: true,
 		Secure:   h.config.App.Env == "prod",
-		SameSite: "Lax",
+		SameSite: "lax",
 		Path:     "/",
 	})
 	return c.JSON(domain.HttpResponse{

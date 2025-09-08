@@ -22,6 +22,7 @@ func (m *Middleware) Auth() fiber.Handler {
 			})
 		} else if string(c.Request().Header.Cookie("session")) != "" {
 			sessionToken := c.Request().Header.Cookie("session")
+			m.log.Info("session token: " + string(sessionToken))
 			session, refreshed, err := m.security.GetSession(c.RequestCtx(), string(sessionToken))
 			if err != nil {
 				return utils.ErrorResponse(c, domain.ErrUnauthorized, nil)

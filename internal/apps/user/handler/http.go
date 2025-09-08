@@ -33,7 +33,8 @@ func (h *userHandler) getUser(c fiber.Ctx) error {
 
 	c.Response().Header.Set("Cache-Control", "private, max-age=60")
 
-	return c.JSON(fiber.Map{
-		"data": session,
+	return c.JSON(domain.HttpResponse{
+		Success: true,
+		Data:    session,
 	})
 }
