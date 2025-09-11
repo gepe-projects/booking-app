@@ -44,3 +44,7 @@ func (u *authUsecase) Login(ctx context.Context, req *domain.LoginDTO) (*domain.
 func (u *authUsecase) GetAllActiveSessions(ctx context.Context, userId string) ([]domain.SessionWithExpiry, error) {
 	return u.security.GetUserActiveSessionsWithDetails(ctx, userId)
 }
+
+func (u *authUsecase) Logout(ctx context.Context, userID string, token string) error {
+	return u.security.LogoutSession(ctx, userID, token)
+}

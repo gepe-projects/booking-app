@@ -27,4 +27,5 @@ type AuthUsecase interface {
 	RegisterUser(ctx context.Context, req *RegisterDTO) (res *UserWithIdentity, err error)
 	Login(ctx context.Context, req *LoginDTO) (res *UserWithIdentity, token string, err error)
 	GetAllActiveSessions(ctx context.Context, userId string) (sessions []SessionWithExpiry, err error)
+	Logout(ctx context.Context, userID string, token string) error
 }

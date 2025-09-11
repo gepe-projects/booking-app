@@ -39,6 +39,7 @@ func (m *Middleware) Auth() fiber.Handler {
 				})
 			}
 			c.Locals(domain.SessionCtxKey, session)
+			c.Locals(domain.SessionTokenCtxKey, string(sessionToken))
 		}
 
 		return c.Next()

@@ -41,6 +41,7 @@ func (h *authHandler) RegisterRoutes(r fiber.Router) {
 	r.Post("/register", h.register)
 	r.Post("/login", h.mw.LoginLimiter(), h.login)
 	r.Get("/sessions", h.mw.Auth(), h.getAllActiveSessions)
+	r.Delete("/logout", h.mw.Auth(), h.logout)
 }
 
 func (h *authHandler) register(c fiber.Ctx) error {
@@ -106,5 +107,21 @@ func (h *authHandler) getAllActiveSessions(c fiber.Ctx) error {
 	return c.JSON(domain.HttpResponse{
 		Success: true,
 		Data:    sessions,
+	})
+}
+
+func (h *authHandler) logout(c fiber.Ctx) error {
+	session := c.Locals(domain.SessionCtxKey).(*domain.Session)
+	sessionToken := c.Locals(domain.SessionTokenCtxKey).(string)
+
+	err := h.authUsecase.Logout(c.RequestCtx(), session.UserID, sessionToken)
+	if err != nil {
+		h.log.Error(err, "failed to logout")
+		c.JSON(domain.HttpResponse{
+			Success: true,
+		})
+	}
+	return c.JSON(domain.HttpResponse{
+		Success: true,
 	})
 }
